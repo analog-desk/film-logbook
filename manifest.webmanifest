@@ -1,0 +1,16 @@
+{
+  "name": "Film Logbook",
+  "short_name": "Film Log",
+  "description": "Log every frame of analog film as you shoot it.",
+  "start_url": "./#log",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f2ede2",
+  "theme_color": "#f2ede2",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
