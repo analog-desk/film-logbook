@@ -27,7 +27,7 @@ Stored as one versioned JSON document in `localStorage` (`filmlog:db`), with the
 - **Roll**: `id, format, frameCapacity, extraFrames, filmBrand, filmStock, boxIso, shootingIso, exposureApproach (box|push|pull), exposureStops, processingStops, processingInstructions, cameraId, cameraName, startedAt, completedAt, status (active|completed|archived), notes, cursor, pendingMulti`
 - **Frame** (physical): `id, rollId, number`. Unique per roll; exists only while it has exposures.
 - **Exposure**: `id, frameId, rollId, sequence, aperture, shutter, weather[], subject, notes, createdAt, updatedAt`
-- **Camera**: `id, name, format, fastest, slowest, bulb, minF, maxF, hidden`
+- **Camera**: `id, name, format, shutters[] (exact speeds offered, e.g. 1/300…1/25), fastest, slowest, bulb, minF, maxF, hidden`
 - **Scan** (reserved for later): `id, rollId, frameId, frameNumber, exposureId?, uri, addedAt`
 
 `addExposure()` refuses to write to a logged frame unless explicitly appending a multiple exposure, so frames can't be silently overwritten.

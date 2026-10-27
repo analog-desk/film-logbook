@@ -2,8 +2,8 @@
  * Data lives in localStorage as one versioned JSON document (see Store). */
 'use strict';
 
-const APP_VERSION = '1.0.0';
-const SCHEMA_VERSION = 1;
+const APP_VERSION = '1.1.0';
+const SCHEMA_VERSION = 2;
 const STORAGE_KEY = 'filmlog:db';
 const PREV_KEY = 'filmlog:db:prev';
 
@@ -41,11 +41,36 @@ const SHUTTERS = [
   ['1/2', 1 / 2], ['1s', 1], ['2s', 2], ['4s', 4], ['8s', 8], ['15s', 15], ['30s', 30],
 ].map(([label, sec]) => ({ label, sec }));
 const shutterLabel = (v) => (v === '1s' ? '1 sec' : v);
+function shutterSeconds(label) {
+  const m = /^1\/(\d+(?:\.\d+)?)$/.exec(label);
+  if (m) return 1 / Number(m[1]);
+  const n = /^(\d+(?:\.\d+)?)s$/.exec(label);
+  return n ? Number(n[1]) : null;
+}
+// Reads a typed list like "1/300, 100, 50, 25, B". A bare number above 1 is read the
+// way shutter dials print it (300 = 1/300); "1" and "2s" are whole seconds.
+function parseShutterList(text) {
+  const out = [];
+  let bulb = false;
+  for (const raw of String(text).split(/[\s,;]+/)) {
+    const t = raw.trim().toLowerCase().replace(/(sec|"|″)$/, 's');
+    if (!t) continue;
+    if (t === 'b' || t === 'bulb') { bulb = true; continue; }
+    let label = null;
+    if (/^1\/\d+(\.\d+)?$/.test(t)) label = t;
+    else if (/^\d+(\.\d+)?s$/.test(t)) label = t;
+    else if (/^\d+(\.\d+)?$/.test(t)) label = Number(t) > 1 ? '1/' + t : t + 's';
+    if (!label) throw new Error(`“${raw}” is not a shutter speed. Use values like 1/300, 50 or 2s.`);
+    if (!out.includes(label)) out.push(label);
+  }
+  out.sort((a, b) => shutterSeconds(a) - shutterSeconds(b));
+  return { list: out, bulb };
+}
 
 const DEFAULT_CAMERAS = [
   { id: 'cam_pentaxlx', name: 'Pentax LX', format: '35mm', fastest: 1 / 2000, slowest: 4, bulb: true, minF: null, maxF: null },
   { id: 'cam_ae1p', name: 'Canon AE-1 Program', format: '35mm', fastest: 1 / 1000, slowest: 2, bulb: true, minF: null, maxF: null },
-  { id: 'cam_yashicaa', name: 'Yashica A Twin Lens Reflex', format: '120', fastest: 1 / 500, slowest: 1, bulb: true, minF: 3.5, maxF: 22 },
+  { id: 'cam_yashicaa', name: 'Yashica A Twin Lens Reflex', format: '120', fastest: 1 / 300, slowest: 1 / 25, bulb: true, minF: 3.5, maxF: 22, shutters: ['1/300', '1/100', '1/50', '1/25'] },
 ];
 
 /* ---------- weather icons: field-notebook line drawings on a 32px grid ---------- */
@@ -151,6 +176,14 @@ function migrate(db) {
   for (const k of ['cameras', 'rolls', 'frames', 'exposures', 'scans']) if (!Array.isArray(db[k])) db[k] = k === 'cameras' ? base.cameras : [];
   for (const k of ['drafts', 'outbox']) if (!db[k] || typeof db[k] !== 'object') db[k] = {};
   db.meta = { ...base.meta, ...(db.meta || {}) };
+  if (v < 2) {
+    // v2: cameras can list exact shutter speeds. Correct the Yashica A to its real
+    // 1/300–1/25 shutter unless the user already changed that camera's range.
+    const y = db.cameras.find((c) => c.id === 'cam_yashicaa');
+    if (y && !y.shutters && Math.abs(y.fastest - 1 / 500) < 1e-9 && y.slowest === 1) {
+      Object.assign(y, { shutters: ['1/300', '1/100', '1/50', '1/25'], fastest: 1 / 300, slowest: 1 / 25 });
+    }
+  }
   db.schemaVersion = SCHEMA_VERSION;
   return db;
 }
@@ -445,7 +478,7 @@ function apertureOptions(cam) {
   return APERTURES.filter((f) => (!cam.minF || f >= cam.minF - 1e-9) && (!cam.maxF || f <= cam.maxF + 1e-9)).map(fmtAperture);
 }
 function shutterOptions(cam) {
-  const list = SHUTTERS.filter((s) => s.sec >= (cam.fastest || 0) - 1e-9 && s.sec <= (cam.slowest || 1e9) + 1e-9).map((s) => s.label);
+  const list = Array.isArray(cam.shutters) && cam.shutters.length ? [...cam.shutters] : SHUTTERS.filter((s) => s.sec >= (cam.fastest || 0) - 1e-9 && s.sec <= (cam.slowest || 1e9) + 1e-9).map((s) => s.label);
   if (cam.bulb !== false) list.push('B');
   return list;
 }
@@ -1045,7 +1078,6 @@ function highlight(text, terms) {
 function viewPrefs() {
   const d = db();
   const pending = Object.keys(d.outbox).length;
-  const shutterSel = (name, val, list) => `<select class="select input" name="${name}">${list.map((s) => `<option value="${s.sec}" ${Math.abs(s.sec - val) < 1e-9 ? 'selected' : ''}>${s.label}</option>`).join('')}</select>`;
   return `<header class="topbar"><a class="back" href="#rolls">${icon('back')} Rolls</a></header>
   <div class="wiz-q"><h1>Settings</h1></div>
   <div class="stack">
@@ -1072,13 +1104,12 @@ function viewPrefs() {
     <div class="divider"></div>
     <section class="stack">
       <div class="section-head"><h2>Cameras</h2><button class="btn" data-act="cam-add">${icon('plus')} Add camera</button></div>
-      <p class="muted">Shutter range limits the speeds offered while logging. “Other” is always available.</p>
+      <p class="muted">Only these shutter speeds are offered while logging. “Other” is always available for anything else.</p>
       ${d.cameras.map((c) => `<form class="cam-row" data-cam="${c.id}">
         <div class="field"><label class="label" for="cn-${c.id}">Name</label><input class="input" id="cn-${c.id}" name="name" value="${esc(c.name)}" required></div>
-        <div class="two">
-          <div class="field"><span class="label">Fastest</span>${shutterSel('fastest', c.fastest, SHUTTERS.slice(0, 9))}</div>
-          <div class="field"><span class="label">Slowest</span>${shutterSel('slowest', c.slowest, SHUTTERS.slice(9))}</div>
-        </div>
+        <div class="field"><label class="label" for="cs-${c.id}">Shutter speeds</label>
+          <input class="input mono" id="cs-${c.id}" name="shutters" value="${esc(shutterOptions(c).join(', '))}" placeholder="1/300, 1/100, 1/50, 1/25, B" autocomplete="off">
+          <span class="hint">Separate with commas. Add B if it has a bulb setting.</span></div>
         <div class="two">
           <div class="field"><span class="label">Format</span><select class="select input" name="format">${['35mm', '120'].map((f) => `<option ${c.format === f ? 'selected' : ''}>${f}</option>`).join('')}</select></div>
           <div class="field"><span class="label">In new-roll list</span><select class="select input" name="hidden"><option value="" ${!c.hidden ? 'selected' : ''}>Shown</option><option value="1" ${c.hidden ? 'selected' : ''}>Hidden</option></select></div>
@@ -1401,7 +1432,15 @@ document.addEventListener('submit', (ev) => {
     toast('Roll details saved');
   } else if (f.dataset.cam) {
     const cam = getCamera(f.dataset.cam);
-    Object.assign(cam, { name: data.name.trim() || cam.name, fastest: Number(data.fastest), slowest: Number(data.slowest), format: data.format, hidden: !!data.hidden });
+    let speeds;
+    try { speeds = parseShutterList(data.shutters); } catch (e) { toast(e.message); return; }
+    if (!speeds.list.length && !speeds.bulb) { toast('Add at least one shutter speed'); return; }
+    Object.assign(cam, {
+      name: data.name.trim() || cam.name, format: data.format, hidden: !!data.hidden,
+      shutters: speeds.list, bulb: speeds.bulb,
+      fastest: speeds.list.length ? shutterSeconds(speeds.list[0]) : cam.fastest,
+      slowest: speeds.list.length ? shutterSeconds(speeds.list[speeds.list.length - 1]) : cam.slowest,
+    });
     db().rolls.filter((r) => r.cameraId === cam.id).forEach((r) => { r.cameraName = cam.name; });
     Store.touch('cameras', cam.id);
     Store.save();
