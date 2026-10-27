@@ -2,7 +2,7 @@
  * Data lives in localStorage as one versioned JSON document (see Store). */
 'use strict';
 
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.2.0';
 const SCHEMA_VERSION = 2;
 const STORAGE_KEY = 'filmlog:db';
 const PREV_KEY = 'filmlog:db:prev';
@@ -579,7 +579,7 @@ function viewLog() {
   <div class="progress-text"><span>${logged} of ${total} frames logged</span><span>${logged === 0 ? '' : Math.round((logged / total) * 100) + '%'}</span></div>`;
 
   if (state === 'end') {
-    return head + `<div class="panel olive">
+    return head + `<div class="panel accent">
       <h2>All ${total} frames logged</h2>
       <p class="muted">Rewind, then mark the roll complete. If your camera gave you an extra frame, add it.</p>
       <button class="btn primary big block" data-act="complete-roll">${icon('check')} Mark roll complete</button>
@@ -590,8 +590,8 @@ function viewLog() {
   if (state === 'filled') {
     const next = firstEmptyFrom(roll, n + 1);
     const nextLabel = next ? `Frame ${pad2(next)}` : 'End of roll';
-    return head + `<div class="panel ${roll.format === '120' ? 'olive' : ''}">
-      <div class="section-head"><h2>Frame ${pad2(n)} ${exps.length > 1 ? `<span class="chip amber">×${exps.length}</span>` : ''}</h2><a class="link" href="#frame-${roll.id}-${n}">Open</a></div>
+    return head + `<div class="panel ${roll.format === '120' ? 'accent' : ''}">
+      <div class="section-head"><h2>Frame ${pad2(n)} ${exps.length > 1 ? `<span class="chip mx">×${exps.length}</span>` : ''}</h2><a class="link" href="#frame-${roll.id}-${n}">Open</a></div>
       ${exps.map((e) => expMiniHtml(e, exps.length)).join('')}
       <p class="label" style="margin-top:4px">${roll.format === '120' ? 'How is the next photograph recorded?' : 'This frame is already logged'}</p>
       <div class="choice">
@@ -608,7 +608,7 @@ function viewLog() {
     ? `<div class="multi-banner" role="status">${icon('multi')}<div><b>DOUBLE EXPOSURE</b><small>Adding exposure ${exps.length + 1} to Frame ${pad2(n)}. The counter will not advance.</small></div><button data-act="cancel-multi">Cancel</button></div>` : '';
   return head + multiBanner + exposureFormHtml(draft, cam, { repeatFrom: last }) + `
   <div class="savebar"><div class="savebar-inner">
-    <button class="btn ${state === 'multi' ? 'amber' : 'primary'} big block" data-act="save-frame">${icon(state === 'multi' ? 'multi' : 'check')} ${state === 'multi' ? `Save Double Exposure · ${pad2(n)}` : `Save Frame ${pad2(n)}`}</button>
+    <button class="btn ${state === 'multi' ? 'mx' : 'primary'} big block" data-act="save-frame">${icon(state === 'multi' ? 'multi' : 'check')} ${state === 'multi' ? `Save Double Exposure · ${pad2(n)}` : `Save Frame ${pad2(n)}`}</button>
     <div class="draft-status" id="draft-status">${draftHasContent(draft) ? 'Draft saved' : ''}</div>
   </div></div>`;
 }
@@ -627,8 +627,8 @@ function stripHtml(roll, n) {
 }
 
 function expMiniHtml(e, count) {
-  return `<div class="exp-mini" style="${count > 1 ? 'border-left-color:var(--amber)' : ''}">
-    <div class="row1">${count > 1 ? `<span class="chip amber">Exp ${e.sequence}</span>` : ''}<span class="${e.subject ? '' : 'muted'}" style="font-family:var(--font-display);font-size:1.1rem">${esc(e.subject || 'No description')}</span></div>
+  return `<div class="exp-mini" style="${count > 1 ? 'border-left-color:var(--ink)' : ''}">
+    <div class="row1">${count > 1 ? `<span class="chip mx">Exp ${e.sequence}</span>` : ''}<span class="${e.subject ? '' : 'muted'}" style="font-family:var(--font-display);font-size:1.1rem">${esc(e.subject || 'No description')}</span></div>
     <div class="mono muted" style="font-size:.85rem">${settingsText(e)} ${e.weather.length ? '· ' + e.weather.map((w) => WX[w]?.label).join(', ') : ''}</div>
   </div>`;
 }
@@ -898,7 +898,7 @@ function frameRowHtml(roll, f) {
   const first = exps[0];
   const wx = [...new Set(exps.flatMap((e) => e.weather))];
   return `<a class="frame-row" href="#frame-${roll.id}-${f.number}">
-    <div class="no">${pad2(f.number)}${exps.length > 1 ? `<small style="color:var(--amber)">×${exps.length} EXP</small>` : ''}</div>
+    <div class="no">${pad2(f.number)}${exps.length > 1 ? `<small style="color:var(--ink)">×${exps.length} EXP</small>` : ''}</div>
     <div class="body">
       <span class="subj ${first.subject ? '' : 'none'}">${esc(first.subject || 'No description')}</span>
       <span class="set">${settingsText(first)}</span>
@@ -926,7 +926,7 @@ function viewFrame(rollId, n) {
     <div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap">
       <div class="big-frame">${pad2(n)}</div>
       <div style="padding-bottom:8px"><p class="eyebrow">Frame ${n} of ${roll.frameCapacity} · ${esc(roll.format)}</p>
-        ${exps.length > 1 ? `<span class="chip amber" style="margin-top:6px">${icon('multi')} ${exps.length} exposures on this frame</span>` : ''}</div>
+        ${exps.length > 1 ? `<span class="chip mx" style="margin-top:6px">${icon('multi')} ${exps.length} exposures on this frame</span>` : ''}</div>
     </div>
     <div class="kv">
       <div><span class="label">Film</span><span class="v">${esc(rollTitle(roll))}</span></div>
@@ -1058,7 +1058,7 @@ function searchResultsHtml() {
     return `<a class="result" href="#frame-${roll.id}-${frame.number}">
       <span class="subj">${highlight(e.subject || 'No description', terms)}</span>
       ${e.notes ? `<span class="muted" style="font-size:.9rem">${highlight(e.notes.length > 120 ? e.notes.slice(0, 120) + '…' : e.notes, terms)}</span>` : ''}
-      <span class="where"><b class="mono" style="color:var(--ink)">Frame ${pad2(frame.number)}</b>${count > 1 ? `<span class="chip amber">Exp ${e.sequence}/${count}</span>` : ''}<span>${esc(rollTitle(roll))}</span><span>·</span><span>${esc(rollCamera(roll).name)}</span></span>
+      <span class="where"><b class="mono" style="color:var(--ink)">Frame ${pad2(frame.number)}</b>${count > 1 ? `<span class="chip mx">Exp ${e.sequence}/${count}</span>` : ''}<span>${esc(rollTitle(roll))}</span><span>·</span><span>${esc(rollCamera(roll).name)}</span></span>
       <span class="where mono"><span>${settingsText(e)}</span><span>· EI ${roll.shootingIso}</span><span class="icons">${e.weather.map((w) => wxSvg(w, WX[w]?.label)).join('')}</span><span>· ${fmtDate(e.createdAt)}</span></span>
     </a>`;
   }).join('');
